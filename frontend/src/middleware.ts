@@ -1,23 +1,14 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
-// Lightweight edge check: does a refreshToken cookie exist at all?
-// Real authorisation (valid token? right role?) is enforced by the API on every request;
-// role-based screens are additionally guarded client-side with useRequireRole().
-const PROTECTED_PREFIXES = [
-  "/dashboard", "/admin", "/landlord", "/applications", "/leases", "/maintenance",
-];
-
-export function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
-  const isProtected = PROTECTED_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
-  if (!isProtected) return NextResponse.next();
-
-  if (!req.cookies.has("refreshToken")) {
-    const loginUrl = new URL("/login", req.url);
-    // only same-site relative paths are ever used as redirect targets
-    loginUrl.searchParams.set("redirectTo", pathname);
-    return NextResponse.redirect(loginUrl);
-  }
+/**
+ * The refresh-token cookie is issued by the API host. In production the API runs on Render and
+ * the UI on Vercel, so that cookie is not visible to this middleware. Redirecting protected
+ * routes based on cookie presence sends every signed-in user back to /login.
+ *
+ * Real authorisation is enforced by the API on every request, and role-based screens are guarded
+ * client-side with useRequireRole(). This middleware is intentionally a pass-through.
+ */
+export function middleware() {
   return NextResponse.next();
 }
 
