@@ -20,6 +20,7 @@ import conversationRoutes from "./routes/conversation.routes";
 import notificationRoutes from "./routes/notification.routes";
 import dashboardRoutes from "./routes/dashboard.routes";
 import adminRoutes from "./routes/admin.routes";
+import savedSearchRoutes from "./routes/saved-search.routes";
 import { reportRouter, reviewRouter } from "./routes/report.routes";
 
 
@@ -70,6 +71,7 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/reports", reportRouter);
 app.use("/api/reviews", reviewRouter);
+app.use("/api/saved-searches", savedSearchRoutes);
 
 // Unknown routes first, then the error handler (error middleware must be registered last).
 app.use((_req, res) => {

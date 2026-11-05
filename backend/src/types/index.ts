@@ -265,3 +265,17 @@ export interface Message {
   body: string;
   created_at: string;
 }
+
+export interface SavedSearch {
+  id: string;
+  user_id: string;
+  name: string;
+  filters: Record<string, unknown>;
+  alerts_enabled: boolean;
+  last_checked_at: string | null;
+  last_seen_ids: string[];
+  last_new_count: number;
+  created_at: string;
+  updated_at: string;
+}
+

@@ -32,6 +32,7 @@ const TYPE_DOT: Record<string, string> = {
   MAINTENANCE_CREATED: "bg-primary",
   MAINTENANCE_STATUS_UPDATED: "bg-primary",
   MESSAGE_RECEIVED: "bg-primary",
+  SAVED_SEARCH_MATCHES: "bg-gold",
 };
 
 export function NotificationBell() {

@@ -46,6 +46,7 @@ async function usersById(ids: string[]) {
   return new Map((data ?? []).map((u) => [u.id, u]));
 }
 
+
 /* ───────────── Analytics ───────────── */
 
 const monthKey = (d: Date) => d.toISOString().slice(0, 7);
@@ -59,9 +60,11 @@ function lastMonths(n: number): string[] {
 
 const head = (table: string) => supabaseAdmin.from(table).select("id", { count: "exact", head: true });
 
+
 export async function getStats() {
   const since = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() - 5, 1)).toISOString();
   const d30 = new Date(Date.now() - 30 * 864e5).toISOString();
+
 
   const [
     users, tenants, landlords, suspended, properties, available, pendingVer, openReports, activeLeases,
@@ -82,6 +85,7 @@ export async function getStats() {
     supabaseAdmin.from("payments").select("amount, paid_at").eq("status", "SUCCEEDED").gte("paid_at", since).limit(20000),
     supabaseAdmin.from("audit_log").select("id, action, meta, created_at").order("created_at", { ascending: false }).limit(8),
   ]);
+
 
   const months = lastMonths(6);
   const signups = new Map(months.map((m) => [m, { month: monthLabel(m), tenants: 0, landlords: 0 }]));
@@ -159,6 +163,7 @@ export async function setSuspension(adminId: string, userId: string, suspended: 
     .single();
   if (error || !data) throw fail("Failed to update user.", 500);
 
+
   invalidateUserStatus(userId);
   if (suspended) {
     // kill every session: refresh tokens + live sockets
@@ -177,6 +182,7 @@ export async function listProperties(q: { search?: string; status?: string; page
     .select("id, title, city, status, rent_amount, landlord_id, created_at", { count: "exact" })
     .order("created_at", { ascending: false })
     .range(from, to);
+
   const term = safeTerm(q.search);
   if (term) query = query.or(`title.ilike.%${term}%,city.ilike.%${term}%`);
   if (q.status) query = query.eq("status", q.status);
@@ -196,6 +202,7 @@ export async function setPropertyStatus(adminId: string, propertyId: string, sta
   if (status === "ARCHIVED" && (await hasLiveLease(propertyId))) {
     throw fail("End or cancel the active lease before archiving this property.", 409);
   }
+
   if (status === "ARCHIVED" && (await hasActiveReservation(propertyId))) {
     throw fail("This property is reserved for an approved applicant. Release the reservation before archiving it.", 409);
   }
@@ -228,6 +235,7 @@ export async function listApplications(q: { status?: string; search?: string; pa
       supabaseAdmin.from("properties").select("id").or(`title.ilike.%${term}%,city.ilike.%${term}%`).limit(SEARCH_ID_CAP),
       supabaseAdmin.from("users").select("id").or(`full_name.ilike.%${term}%,email.ilike.%${term}%`).limit(SEARCH_ID_CAP),
     ]);
+
     const clauses = [
       props?.length ? `property_id.in.(${props.map((r) => r.id).join(",")})` : null,
       tenants?.length ? `tenant_id.in.(${tenants.map((r) => r.id).join(",")})` : null,
@@ -248,6 +256,7 @@ export async function listApplications(q: { status?: string; search?: string; pa
   }));
   return toPaged(items, count ?? 0, p, l);
 }
+
 
 
 /* ───────────── Landlord verification ───────────── */
@@ -369,6 +378,7 @@ export async function setReviewHidden(adminId: string, id: string, hidden: boole
   return data;
 }
 
+
 /* ───────────── Audit log ───────────── */
 
 export async function listAudit(q: { page?: number; limit?: number; action?: string; targetType?: string; since?: string; until?: string }) {
@@ -381,15 +391,12 @@ export async function listAudit(q: { page?: number; limit?: number; action?: str
   if (q.since) query = query.gte("created_at", q.since);
   if (q.until) query = query.lte("created_at", q.until);
 
+
   const { data, count, error } = await query;
   if (error) throw fail(error.message, 500);
   const people = await usersById((data ?? []).map((r) => r.actor_id as string));
   return toPaged((data ?? []).map((r) => ({ ...r, actor: r.actor_id ? people.get(r.actor_id) ?? null : null })), count ?? 0, p, l);
 }
-
-
-
-
 
 type ReportStatus = "OPEN" | "INVESTIGATING" | "RESOLVED" | "DISMISSED";
 
@@ -434,7 +441,6 @@ export async function listReports(q: { kind?: string; status?: string; search?: 
     };
   }), count ?? 0, p, l);
 }
-
 type TargetLookup = { property: Map<string, string>; review: Map<string, { propertyId: string; title: string }>; lease: Map<string, { propertyId: string; title: string }> };
 
 async function resolveReportTargets(ids: { property: string[]; review: string[]; lease: string[] }): Promise<TargetLookup> {
@@ -449,6 +455,7 @@ async function resolveReportTargets(ids: { property: string[]; review: string[];
     lease: new Map((leases.data ?? []).map((r: any) => [r.id, { propertyId: r.property_id as string, title: (r.properties?.title ?? "Property") as string }])),
   };
 }
+
 
 function describeTarget(
   type: string | null, id: string | null, t: TargetLookup,
@@ -483,6 +490,7 @@ export async function resolveReport(adminId: string, id: string, status: Exclude
   if (readErr) throw fail(readErr.message, 500);
   if (!current) throw fail("Report not found.", 404);
 
+
   const from = current.status as ReportStatus;
   if (!REPORT_TRANSITIONS[from]?.includes(status)) {
     throw fail(`A ${from.toLowerCase()} report can't be moved to ${status.toLowerCase()}.`, 409);
@@ -500,13 +508,16 @@ export async function resolveReport(adminId: string, id: string, status: Exclude
       resolved_at: closing ? now : null,
       updated_at: now,
     })
+
     .eq("id", id).eq("status", from) // optimistic lock: fails if someone else changed it first
     .select().maybeSingle();
   if (error) throw fail(error.message, 500);
   if (!data) throw fail("This report was just updated by another admin. Refresh and try again.", 409);
 
   const reopened = !closing && (from === "RESOLVED" || from === "DISMISSED");
+
   await auditSoft(adminId, reopened ? "REPORT_REOPENED" : `REPORT_${status}`, "REPORT", id, {
+  
     label: current.subject, from, to: status, note,
   });
 

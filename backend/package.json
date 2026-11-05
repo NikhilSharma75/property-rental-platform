@@ -7,7 +7,8 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "create-admin": "ts-node scripts/create-admin.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "check-saved-searches": "ts-node scripts/run-saved-searches.ts"
   },
   "keywords": [],
   "author": "",

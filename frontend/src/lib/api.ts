@@ -6,7 +6,6 @@ export interface PublicUser {
   phone: string | null;
   profile_image_url: string | null;
   is_verified: boolean;
-
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000/api";
@@ -56,9 +55,7 @@ export async function request<T>(
     },
   });
 
-  
-
-   if (res.status === 401 && retry) {
+  if (res.status === 401 && retry) {
     const refreshed = await refreshOnce().catch(() => null);
     if (refreshed) {
       setAccessToken(refreshed.accessToken);
@@ -72,6 +69,8 @@ export async function request<T>(
   }
   return data as T;
 }
+
+// ─── Profile ───────────────────────────────────────────────────────────────
 
 export type VerificationStatus = "NOT_SUBMITTED" | "PENDING" | "VERIFIED" | "REJECTED";
 export type GovernmentIdType = "PASSPORT" | "NATIONAL_ID" | "DRIVERS_LICENSE";
@@ -136,9 +135,17 @@ export interface VerificationSubmitBody {
   proofOfOwnership?: File | null;
 }
 
+// ─── Properties ────────────────────────────────────────────────────────────
 
 export type PropertyType =
-  | "APARTMENT" | "HOUSE" | "VILLA" | "STUDIO" | "TOWNHOUSE" | "CONDO" | "OTHER";
+  | "APARTMENT"
+  | "HOUSE"
+  | "VILLA"
+  | "STUDIO"
+  | "TOWNHOUSE"
+  | "CONDO"
+  | "OTHER";
+
 export type PropertyStatus = "DRAFT" | "AVAILABLE" | "RESERVED" | "RENTED" | "ARCHIVED";
 
 export interface Property {
@@ -263,8 +270,10 @@ export const api = {
     if (body.businessRegistrationNumber)
       form.append("businessRegistrationNumber", body.businessRegistrationNumber);
     if (body.taxId) form.append("taxId", body.taxId);
-    if (body.governmentIdDocument) form.append("governmentIdDocument", body.governmentIdDocument);
-    if (body.proofOfOwnership) form.append("proofOfOwnership", body.proofOfOwnership);
+    if (body.governmentIdDocument)
+      form.append("governmentIdDocument", body.governmentIdDocument);
+    if (body.proofOfOwnership)
+      form.append("proofOfOwnership", body.proofOfOwnership);
 
     return request<{ verification: LandlordVerification }>("/profile/verification", {
       method: "POST",
@@ -277,22 +286,35 @@ export const api = {
   getProperty: (id: string) => request<{ property: Property }>(`/properties/${id}`),
 
   createProperty: (body: PropertyInput) =>
-    request<{ property: Property }>("/properties", { method: "POST", body: JSON.stringify(body) }),
+    request<{ property: Property }>("/properties", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 
   updateProperty: (id: string, body: Partial<PropertyInput>) =>
-    request<{ property: Property }>(`/properties/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+    request<{ property: Property }>(`/properties/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
 
   /** "Delete" archives the property (it is never hard-deleted). Restore it with restoreProperty. */
   deleteProperty: (id: string) =>
-    request<{ message: string; result: "ARCHIVED" }>(`/properties/${id}`, { method: "DELETE" }),
+    request<{ message: string; result: "ARCHIVED" }>(`/properties/${id}`, {
+      method: "DELETE",
+    }),
 
   restoreProperty: (id: string) =>
-    request<{ property: Property; message: string }>(`/properties/${id}/restore`, { method: "POST" }),
+    request<{ property: Property; message: string }>(`/properties/${id}/restore`, {
+      method: "POST",
+    }),
 
   uploadPropertyImages: (id: string, files: File[]) => {
     const form = new FormData();
     files.forEach((file) => form.append("images", file));
-    return request<{ property: Property }>(`/properties/${id}/images`, { method: "POST", body: form });
+    return request<{ property: Property }>(`/properties/${id}/images`, {
+      method: "POST",
+      body: form,
+    });
   },
 
   removePropertyImage: (id: string, url: string) =>
@@ -302,7 +324,7 @@ export const api = {
     }),
 };
 
-
+// ─── Public properties ─────────────────────────────────────────────────────
 
 export interface PublicProperty {
   id: string;
@@ -310,7 +332,7 @@ export interface PublicProperty {
   title: string;
   description: string | null;
   property_type: PropertyType;
-  status: "DRAFT" | "AVAILABLE" | "RESERVED" | "RENTED" | "ARCHIVED";
+  status: PropertyStatus;
   address_line1: string;
   address_line2: string | null;
   city: string;
@@ -329,7 +351,6 @@ export interface PublicProperty {
   created_at: string;
   distance_km: number | null;
   is_favorited: boolean;
-
 }
 
 export interface PropertySearchParams {
@@ -377,8 +398,6 @@ export interface PublicUnit {
   deposit_amount: number | null;
 }
 
-
-
 export const publicPropertyApi = {
   search: (params: PropertySearchParams) =>
     request<PropertySearchResult>(`/public/properties?${toQueryString(params)}`),
@@ -387,7 +406,9 @@ export const publicPropertyApi = {
     request<{ property: PublicProperty }>(`/public/properties/${id}`),
 
   availableUnits: (id: string) =>
-    request<{ hasUnits: boolean; units: PublicUnit[] }>(`/public/properties/${id}/units`),
+    request<{ hasUnits: boolean; units: PublicUnit[] }>(
+      `/public/properties/${id}/units`
+    ),
 };
 
 export const favoriteApi = {
@@ -398,10 +419,47 @@ export const favoriteApi = {
     request<{ message: string }>(`/favorites/${propertyId}`, { method: "DELETE" }),
 };
 
+// ─── Saved searches ────────────────────────────────────────────────────────
 
+export type SavedSearchFilters = Omit<PropertySearchParams, "page" | "limit" | "sort">;
 
-// ─── Types ─────────────────────────────────────────────────────────────────
-export type ApplicationStatus = "PENDING" | "APPROVED" | "REJECTED" | "WITHDRAWN" | "EXPIRED";
+export interface SavedSearch {
+  id: string;
+  name: string;
+  filters: SavedSearchFilters;
+  alerts_enabled: boolean;
+  last_checked_at: string | null;
+  last_new_count: number;
+  created_at: string;
+}
+
+export const savedSearchApi = {
+  list: () => request<{ savedSearches: SavedSearch[] }>("/saved-searches"),
+
+  create: (body: { name: string; filters: SavedSearchFilters }) =>
+    request<{ savedSearch: SavedSearch }>("/saved-searches", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  update: (id: string, body: { name?: string; alertsEnabled?: boolean }) =>
+    request<{ savedSearch: SavedSearch }>(`/saved-searches/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+
+  remove: (id: string) =>
+    request<{ message: string }>(`/saved-searches/${id}`, { method: "DELETE" }),
+};
+
+// ─── Applications ──────────────────────────────────────────────────────────
+
+export type ApplicationStatus =
+  | "PENDING"
+  | "APPROVED"
+  | "REJECTED"
+  | "WITHDRAWN"
+  | "EXPIRED";
 
 export type DocumentCategory =
   | "USER_DOCUMENT"
@@ -409,7 +467,6 @@ export type DocumentCategory =
   | "RECEIPT"
   | "MAINTENANCE_ATTACHMENT"
   | "APPLICATION_DOCUMENT";
-
 
 export interface DocumentRecord {
   id: string;
@@ -439,10 +496,10 @@ export interface RentalApplication {
   rejection_reason: string | null;
   reviewed_by: string | null;
   reviewed_at: string | null;
+  unit_id: string | null;
+  expires_at: string | null;
   created_at: string;
   updated_at: string;
-    unit_id: string | null;
-  expires_at: string | null;
 }
 
 export interface ApplicationWithProperty extends RentalApplication {
@@ -454,12 +511,16 @@ export interface ApplicationWithProperty extends RentalApplication {
   };
 
   // landlord list also joins tenant identity:
-  users?: { full_name: string | null; email: string; phone: string | null };
+  users?: {
+    full_name: string | null;
+    email: string;
+    phone: string | null;
+  };
 }
 
 export interface CreateApplicationInput {
   propertyId: string;
-  desiredMoveInDate: string;   // yyyy-mm-dd
+  desiredMoveInDate: string; // yyyy-mm-dd
   leaseDurationMonths: number;
   monthlyIncome?: number;
   employmentStatus?: string;
@@ -468,9 +529,6 @@ export interface CreateApplicationInput {
   unitId?: string;
 }
 
-
-
-// ─── Applications ──────────────────────────────────────────────────────────
 export const applicationApi = {
   async create(input: CreateApplicationInput) {
     return request<{ application: RentalApplication }>("/applications", {
@@ -509,7 +567,9 @@ export const applicationApi = {
     if (status) qs.set("status", status);
     if (propertyId) qs.set("propertyId", propertyId);
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
-    return request<{ applications: ApplicationWithProperty[] }>(`/applications/landlord${suffix}`);
+    return request<{ applications: ApplicationWithProperty[] }>(
+      `/applications/landlord${suffix}`
+    );
   },
 
   async withdraw(id: string) {
@@ -519,26 +579,27 @@ export const applicationApi = {
     );
   },
 
-  async review(id: string, input: { status: "APPROVED" | "REJECTED"; rejectionReason?: string }) {
+  async review(
+    id: string,
+    input: { status: "APPROVED" | "REJECTED"; rejectionReason?: string }
+  ) {
     return request<{ application: RentalApplication }>(
       `/applications/${id}/review`,
       { method: "PATCH", body: JSON.stringify(input) }
     );
-
-
   },
 };
 
-
 // ─── Generic documents ─────────────────────────────────────────────────────
+
 export const documentApi = {
   async upload(category: DocumentCategory, file: File) {
     const form = new FormData();
     form.append("file", file);
-    return request<{ document: DocumentRecord }>(
-      `/documents/${category}`,
-      { method: "POST", body: form }
-    );
+    return request<{ document: DocumentRecord }>(`/documents/${category}`, {
+      method: "POST",
+      body: form,
+    });
   },
 
   async listMine(category?: DocumentCategory) {
@@ -546,18 +607,19 @@ export const documentApi = {
     return request<{ documents: DocumentRecord[] }>(`/documents${qs}`);
   },
 
-
-  
   async remove(id: string) {
     return request<{ message: string }>(`/documents/${id}`, { method: "DELETE" });
   },
 };
 
-
-
 // ─── Leases ────────────────────────────────────────────────────────────────
-export type LeaseStatus = "DRAFT" | "ACTIVE" | "EXPIRED" | "TERMINATED" | "CANCELLED";
 
+export type LeaseStatus =
+  | "DRAFT"
+  | "ACTIVE"
+  | "EXPIRED"
+  | "TERMINATED"
+  | "CANCELLED";
 
 export interface Lease {
   id: string;
@@ -574,18 +636,17 @@ export interface Lease {
   status: LeaseStatus;
   signed_by_tenant: boolean;
   signed_by_landlord: boolean;
+  unit_id?: string | null;
   created_at: string;
   updated_at: string;
-    unit_id?: string | null;
 }
 
 export interface LeaseWithProperty extends Lease {
   properties?: { title: string; city: string; images: unknown };
   units?: { unit_label: string } | null;
-  users?: { full_name: string | null; email: string; phone: string | null }; // landlord list joins tenant identity
+  // landlord list joins tenant identity:
+  users?: { full_name: string | null; email: string; phone: string | null };
 }
-
-
 
 export interface CreateLeaseInput {
   applicationId?: string;
@@ -596,7 +657,6 @@ export interface CreateLeaseInput {
   leaseStartDate: string; // yyyy-mm-dd
   leaseDurationMonths: number;
   terms?: string;
-
 }
 
 export const leaseApi = {
@@ -619,7 +679,10 @@ export const leaseApi = {
     return request<{ leases: LeaseWithProperty[] }>("/leases/landlord");
   },
 
-  async updateStatus(id: string, status: "ACTIVE" | "TERMINATED" | "EXPIRED" | "CANCELLED") {
+  async updateStatus(
+    id: string,
+    status: "ACTIVE" | "TERMINATED" | "EXPIRED" | "CANCELLED"
+  ) {
     return request<{ lease: Lease }>(`/leases/${id}/status`, {
       method: "PATCH",
       body: JSON.stringify({ status }),
@@ -640,7 +703,7 @@ export const leaseApi = {
       headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
     });
 
-     if (res.status === 401 && retry) {
+    if (res.status === 401 && retry) {
       const refreshed = await refreshOnce().catch(() => null);
       if (refreshed) {
         setAccessToken(refreshed.accessToken);
@@ -665,9 +728,24 @@ export const leaseApi = {
 };
 
 // ─── Maintenance ───────────────────────────────────────────────────────────
-export type MaintenanceCategory = "PLUMBING" | "ELECTRICAL" | "HVAC" | "APPLIANCE" | "STRUCTURAL" | "PEST_CONTROL" | "OTHER";
+
+export type MaintenanceCategory =
+  | "PLUMBING"
+  | "ELECTRICAL"
+  | "HVAC"
+  | "APPLIANCE"
+  | "STRUCTURAL"
+  | "PEST_CONTROL"
+  | "OTHER";
+
 export type MaintenancePriority = "LOW" | "MEDIUM" | "HIGH" | "EMERGENCY";
-export type MaintenanceStatus = "SUBMITTED" | "ACKNOWLEDGED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+
+export type MaintenanceStatus =
+  | "SUBMITTED"
+  | "ACKNOWLEDGED"
+  | "IN_PROGRESS"
+  | "COMPLETED"
+  | "CANCELLED";
 
 export interface MaintenanceRequest {
   id: string;
@@ -700,36 +778,73 @@ export interface CreateMaintenanceInput {
 
 export const maintenanceApi = {
   async create(input: CreateMaintenanceInput) {
-    return request<{ request: MaintenanceRequest }>("/maintenance", { method: "POST", body: JSON.stringify(input) });
+    return request<{ request: MaintenanceRequest }>("/maintenance", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
   },
+
   async get(id: string) {
-    return request<{ request: MaintenanceRequest; photos: DocumentRecord[] }>(`/maintenance/${id}`);
+    return request<{ request: MaintenanceRequest; photos: DocumentRecord[] }>(
+      `/maintenance/${id}`
+    );
   },
+
   async uploadPhotos(id: string, files: File[]) {
     const form = new FormData();
     files.forEach((f) => form.append("photos", f));
-    return request<{ photos: DocumentRecord[] }>(`/maintenance/${id}/photos`, { method: "POST", body: form });
+    return request<{ photos: DocumentRecord[] }>(`/maintenance/${id}/photos`, {
+      method: "POST",
+      body: form,
+    });
   },
+
   async listMine() {
     return request<{ requests: MaintenanceRequest[] }>("/maintenance/mine");
   },
+
   async listForLandlord(status?: MaintenanceStatus) {
-    return request<{ requests: MaintenanceRequest[] }>(`/maintenance/landlord${status ? `?status=${status}` : ""}`);
+    return request<{ requests: MaintenanceRequest[] }>(
+      `/maintenance/landlord${status ? `?status=${status}` : ""}`
+    );
   },
-  async updateStatus(id: string, status: "ACKNOWLEDGED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED", notes?: string) {
-    return request<{ request: MaintenanceRequest }>(`/maintenance/${id}/status`, { method: "PATCH", body: JSON.stringify({ status, notes }) });
+
+  async updateStatus(
+    id: string,
+    status: "ACKNOWLEDGED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED",
+    notes?: string
+  ) {
+    return request<{ request: MaintenanceRequest }>(`/maintenance/${id}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status, notes }),
+    });
   },
+
   async assign(id: string, assignedTo: string) {
-    return request<{ request: MaintenanceRequest }>(`/maintenance/${id}/assign`, { method: "PATCH", body: JSON.stringify({ assignedTo }) });
+    return request<{ request: MaintenanceRequest }>(`/maintenance/${id}/assign`, {
+      method: "PATCH",
+      body: JSON.stringify({ assignedTo }),
+    });
   },
+
   async cancel(id: string) {
-    return request<{ request: MaintenanceRequest }>(`/maintenance/${id}/cancel`, { method: "PATCH" });
+    return request<{ request: MaintenanceRequest }>(`/maintenance/${id}/cancel`, {
+      method: "PATCH",
+    });
   },
 };
 
 // ─── Payments ──────────────────────────────────────────────────────────────
+
 export type PaymentType = "RENT" | "DEPOSIT" | "OTHER";
-export type PaymentStatus = "PENDING" | "PROCESSING" | "SUCCEEDED" | "FAILED" | "REFUNDED" | "CANCELLED";
+
+export type PaymentStatus =
+  | "PENDING"
+  | "PROCESSING"
+  | "SUCCEEDED"
+  | "FAILED"
+  | "REFUNDED"
+  | "CANCELLED";
 
 export interface Payment {
   id: string;
@@ -752,7 +867,8 @@ export interface Payment {
   created_at: string;
   updated_at: string;
   properties?: { title: string; city: string };
-  users?: { full_name: string | null; email: string; phone: string | null }; // landlord list joins tenant identity
+  // landlord list joins tenant identity:
+  users?: { full_name: string | null; email: string; phone: string | null };
 }
 
 export interface CreatePaymentInput {
@@ -764,13 +880,17 @@ export interface CreatePaymentInput {
   dueDate?: string;
 }
 
-async function downloadPaymentPdf(path: string, filename: string, retry: boolean): Promise<void> {
+async function downloadPaymentPdf(
+  path: string,
+  filename: string,
+  retry: boolean
+): Promise<void> {
   const res = await fetch(`${API_URL}${path}`, {
     credentials: "include",
     headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
   });
 
-   if (res.status === 401 && retry) {
+  if (res.status === 401 && retry) {
     const refreshed = await refreshOnce().catch(() => null);
     if (refreshed) {
       setAccessToken(refreshed.accessToken);
@@ -783,8 +903,6 @@ async function downloadPaymentPdf(path: string, filename: string, retry: boolean
     throw new Error(data.message ?? "Failed to download PDF.");
   }
 
-
-  
   const url = URL.createObjectURL(await res.blob());
   const a = document.createElement("a");
   a.href = url;
@@ -797,43 +915,58 @@ async function downloadPaymentPdf(path: string, filename: string, retry: boolean
 
 export const paymentApi = {
   async create(input: CreatePaymentInput) {
-    return request<{ payment: Payment }>("/payments", { method: "POST", body: JSON.stringify(input) });
+    return request<{ payment: Payment }>("/payments", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
   },
+
   async listMine() {
     return request<{ payments: Payment[] }>("/payments/mine");
   },
+
   async listForLandlord() {
     return request<{ payments: Payment[] }>("/payments/landlord");
   },
+
   async listForLease(leaseId: string) {
     return request<{ payments: Payment[] }>(`/payments/lease/${leaseId}`);
   },
+
   async get(id: string) {
     return request<{ payment: Payment }>(`/payments/${id}`);
   },
+
   /** Starts a Stripe Checkout session and sends the browser there to pay. */
   async payNow(id: string) {
-    const { url } = await request<{ url: string }>(`/payments/${id}/checkout-session`, { method: "POST" });
+    const { url } = await request<{ url: string }>(
+      `/payments/${id}/checkout-session`,
+      { method: "POST" }
+    );
     window.location.href = url;
   },
+
   async cancel(id: string) {
-    return request<{ payment: Payment }>(`/payments/${id}/cancel`, { method: "PATCH" });
+    return request<{ payment: Payment }>(`/payments/${id}/cancel`, {
+      method: "PATCH",
+    });
   },
+
   async downloadInvoice(id: string, retry = true): Promise<void> {
     return downloadPaymentPdf(`/payments/${id}/invoice`, `invoice-${id}.pdf`, retry);
   },
-  
+
   async downloadReceipt(id: string, retry = true): Promise<void> {
     return downloadPaymentPdf(`/payments/${id}/receipt`, `receipt-${id}.pdf`, retry);
   },
 
   async sync(id: string) {
-  return request<{ payment: Payment }>(`/payments/${id}/sync`, { method: "POST" });
-},
+    return request<{ payment: Payment }>(`/payments/${id}/sync`, { method: "POST" });
+  },
 };
 
-
 // ─── Messaging ─────────────────────────────────────────────────────────────
+
 export interface Message {
   id: string;
   conversation_id: string;
@@ -854,30 +987,54 @@ export interface Conversation {
   created_at: string;
   unread_count: number;
   properties?: { title: string; city: string };
-  tenant?: { full_name: string | null; email: string; profile_image_url: string | null };
-  landlord?: { full_name: string | null; email: string; profile_image_url: string | null };
+  tenant?: {
+    full_name: string | null;
+    email: string;
+    profile_image_url: string | null;
+  };
+  landlord?: {
+    full_name: string | null;
+    email: string;
+    profile_image_url: string | null;
+  };
 }
 
 export const conversationApi = {
   async list() {
     return request<{ conversations: Conversation[] }>("/conversations");
   },
+
   async listMessages(conversationId: string, before?: string) {
     const qs = before ? `?before=${encodeURIComponent(before)}` : "";
-    return request<{ messages: Message[] }>(`/conversations/${conversationId}/messages${qs}`);
+    return request<{ messages: Message[] }>(
+      `/conversations/${conversationId}/messages${qs}`
+    );
   },
+
   async markRead(conversationId: string) {
-    return request<{ readAt: string }>(`/conversations/${conversationId}/read`, { method: "POST" });
+    return request<{ readAt: string }>(`/conversations/${conversationId}/read`, {
+      method: "POST",
+    });
   },
 };
 
 // ─── Notifications ─────────────────────────────────────────────────────────
+
 export type NotificationType =
-  | "APPLICATION_SUBMITTED" | "APPLICATION_APPROVED" | "APPLICATION_REJECTED"
-  | "LEASE_READY" | "LEASE_ACTIVATED" | "LEASE_EXPIRING"
-  | "INVOICE_CREATED" | "RENT_REMINDER" | "PAYMENT_SUCCEEDED" | "PAYMENT_FAILED"
-  | "MAINTENANCE_CREATED" | "MAINTENANCE_STATUS_UPDATED"
-  | "MESSAGE_RECEIVED";
+  | "APPLICATION_SUBMITTED"
+  | "APPLICATION_APPROVED"
+  | "APPLICATION_REJECTED"
+  | "LEASE_READY"
+  | "LEASE_ACTIVATED"
+  | "LEASE_EXPIRING"
+  | "INVOICE_CREATED"
+  | "RENT_REMINDER"
+  | "PAYMENT_SUCCEEDED"
+  | "PAYMENT_FAILED"
+  | "MAINTENANCE_CREATED"
+  | "MAINTENANCE_STATUS_UPDATED"
+  | "MESSAGE_RECEIVED"
+  | "SAVED_SEARCH_MATCHES";
 
 export interface AppNotification {
   id: string;
@@ -892,19 +1049,22 @@ export interface AppNotification {
 
 export const notificationApi = {
   async list() {
-    return request<{ notifications: AppNotification[]; unreadCount: number }>("/notifications");
+    return request<{ notifications: AppNotification[]; unreadCount: number }>(
+      "/notifications"
+    );
   },
+
   async markRead(id: string) {
     return request<{ ok: true }>(`/notifications/${id}/read`, { method: "PATCH" });
   },
+
   async markAllRead() {
     return request<{ ok: true }>("/notifications/read-all", { method: "PATCH" });
   },
 };
 
+// ─── Dashboard analytics ───────────────────────────────────────────────────
 
-
-// ─── Dashboard analytics ─────────────────────────────────────────────────
 export interface LandlordDashboardStats {
   totalProperties: number;
   activeListings: number;
@@ -923,8 +1083,6 @@ export interface LandlordDashboardStats {
   pendingRevenue: number;
   revenueSeries: { month: string; amount: number }[];
 }
-
-
 
 export interface TenantDashboardStats {
   activeLease: {
@@ -950,13 +1108,14 @@ export const dashboardApi = {
   async landlordStats() {
     return request<LandlordDashboardStats>("/dashboard/landlord");
   },
+
   async tenantStats() {
     return request<TenantDashboardStats>("/dashboard/tenant");
   },
 };
 
-
 // ─── Reports & reviews ─────────────────────────────────────────────────────
+
 export type ReportKindInput = "COMPLAINT" | "REVIEW_FLAG" | "LISTING_REPORT";
 export type ReportTargetType = "USER" | "PROPERTY" | "REVIEW" | "LEASE" | "OTHER";
 
@@ -967,17 +1126,30 @@ export interface ReportInput {
   subject: string;
   details?: string;
 }
-export interface PublicReview { id: string; rating: number; body: string | null; created_at: string; author_name: string }
+
+export interface PublicReview {
+  id: string;
+  rating: number;
+  body: string | null;
+  created_at: string;
+  author_name: string;
+}
 
 export const reportApi = {
   create: (input: ReportInput) =>
-    request<{ report: { id: string; status: string; created_at: string } }>("/reports", {
-      method: "POST", body: JSON.stringify(input),
-    }),
+    request<{ report: { id: string; status: string; created_at: string } }>(
+      "/reports",
+      { method: "POST", body: JSON.stringify(input) }
+    ),
 };
 
 export const reviewApi = {
-  listForProperty: (propertyId: string) => request<{ reviews: PublicReview[] }>(`/reviews/property/${propertyId}`),
+  listForProperty: (propertyId: string) =>
+    request<{ reviews: PublicReview[] }>(`/reviews/property/${propertyId}`),
+
   create: (input: { propertyId: string; rating: number; body?: string }) =>
-    request<{ review: PublicReview }>("/reviews", { method: "POST", body: JSON.stringify(input) }),
+    request<{ review: PublicReview }>("/reviews", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
 };

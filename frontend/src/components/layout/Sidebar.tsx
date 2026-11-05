@@ -52,6 +52,16 @@ function navGroupsForRole(role: string, unread: number): NavGroup[] {
           ? { label: "Properties", href: "/dashboard/properties", icon: <Building2 className={ic} /> }
           : { label: "Browse listings", href: "/properties", icon: <Search className={ic} /> },
         ...(landlord ? [] : [{ label: "Favorites", href: "/dashboard/favorites", icon: <Heart className={ic} /> }]),
+      ...(landlord
+  ? []
+  : [
+      {
+        label: "Saved searches",
+        href: "/dashboard/saved-searches",
+        icon: <Search className={ic} />,
+      },
+    ]),
+
         landlord
           ? { label: "Applications", href: "/landlord/applications", icon: <FileText className={ic} /> }
           : { label: "My applications", href: "/applications", icon: <FileText className={ic} /> },

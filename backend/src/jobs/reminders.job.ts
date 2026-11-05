@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import { supabaseAdmin } from "../config/supabase";
 import * as notificationService from "../services/notification.service";
+import { checkSavedSearches } from "./saved-search.job";
 
 const RENT_REMINDER_DAYS_BEFORE = 3;
 const LEASE_EXPIRY_REMINDER_DAYS_BEFORE = 30;
@@ -189,23 +190,39 @@ export function startReminderJobs() {
   // Daily at 08:00 server time. Each reminder is sent once per payment/lease, tracked via the
   // *_reminder_sent_at columns, so a restart or re-run never double-sends.
   tasks.push(
-    cron.schedule("0 8 * * *", guarded("Reminders", async () => {
-      await sendRentReminders();
-      await sendLeaseExpiryReminders();
-    })),
-     
+    cron.schedule(
+      "0 8 * * *",
+      guarded("Reminders", async () => {
+        await sendRentReminders();
+        await sendLeaseExpiryReminders();
+      })
+    ),
 
+    // Every 15 minutes: notify tenants about new listings matching saved searches.
+    cron.schedule(
+      "*/15 * * * *",
+      guarded("Saved searches", checkSavedSearches)
+    ),
 
     // Every 10 minutes: release approvals/applications whose hold has lapsed.
-    cron.schedule("*/10 * * * *", guarded("Application expiry", expireStaleApplications)),
+    cron.schedule(
+      "*/10 * * * *",
+      guarded("Application expiry", expireStaleApplications)
+    ),
+
     // Daily just after midnight: end ACTIVE leases whose end date has passed.
     cron.schedule("5 0 * * *", guarded("Lease end", expireEndedLeases)),
+
     // Daily at 03:15: delete long-expired login / reset tokens.
-    cron.schedule("15 3 * * *", guarded("Token cleanup", cleanupExpiredTokens)),
+    cron.schedule("15 3 * * *", guarded("Token cleanup", cleanupExpiredTokens))
   );
 
-  console.log("📅 Jobs scheduled: reminders (08:00), application expiry (every 10 min), lease end (00:05), token cleanup (03:15)");
+  console.log(
+    "📅 Jobs scheduled: reminders (08:00), saved searches (every 15 min), application expiry (every 10 min), lease end (00:05), token cleanup (03:15)"
+  );
 }
+
+
 
 
 
